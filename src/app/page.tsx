@@ -6,7 +6,6 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Sun, Moon } from "lucide-react";
-import Image from "next/image";
 // Types
 interface MemeResponse {
   error?: string;
@@ -248,7 +247,7 @@ export default function Home() {
       {memes.map((src, index) => (
         <Card key={index} className="bg-gray-100 dark:bg-gray-800 shadow-md">
           <CardContent className="p-0">
-            <Image
+            <img
               src={src}
               alt={`Generated meme ${index + 1}`}
               className="w-full h-auto rounded-t-md object-contain"
