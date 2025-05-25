@@ -6,6 +6,8 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Sun, Moon } from "lucide-react";
+import Image from "next/image";
+
 // Types
 interface MemeResponse {
   error?: string;
@@ -183,8 +185,15 @@ export default function Home() {
   // Render helpers
   const renderHeader = () => (
     <header className="w-full max-w-xl flex justify-between items-center mb-8">
+      <Image
+        src="/logo.png"
+        alt="MemeGen Logo"
+        width={40}
+        height={40}
+        priority
+      />
       <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
-        MemeGen.ai
+        MemeGen
       </h1>
       <Button
         variant="ghost"
@@ -200,7 +209,18 @@ export default function Home() {
       </Button>
     </header>
   );
-
+  const renderIllustration = () => (
+    <section className="w-full max-w-xl flex justify-center mb-8">
+      <Image
+        src="/memgen.png"
+        alt="Meme Generation Illustration"
+        width={200}
+        height={100}
+        className="rounded-lg shadow-md"
+        priority
+      />
+    </section>
+  );
   const renderForm = () => (
     <section className="w-full max-w-xl space-y-4">
       {error && (
@@ -254,7 +274,16 @@ export default function Home() {
               loading="lazy"
             />
           </CardContent>
-          <CardFooter className="flex justify-end">
+          <CardFooter className="flex justify-end gap-4">
+            <a
+              href={src}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+              onClick={() => handleDownload(src, index)}
+            >
+              View
+            </a>
             <a
               href={src}
               download={`meme-${index + 1}.png`}
@@ -272,6 +301,7 @@ export default function Home() {
   return (
     <main className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300 flex flex-col items-center p-6">
       {renderHeader()}
+      {renderIllustration()}
       {renderForm()}
       {renderMemes()}
     </main>
