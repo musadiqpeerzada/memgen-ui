@@ -284,14 +284,6 @@ export default function Home() {
             >
               View
             </a>
-            <a
-              href={src}
-              download={`meme-${index + 1}.png`}
-              onClick={() => handleDownload(src, index)}
-              className="text-blue-600 dark:text-blue-400 hover:underline"
-            >
-              Download
-            </a>
           </CardFooter>
         </Card>
       ))}
