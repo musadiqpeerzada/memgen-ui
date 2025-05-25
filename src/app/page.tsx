@@ -6,7 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Card, CardContent, CardFooter } from "@/components/ui/card";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Sun, Moon } from "lucide-react";
-
+import Image from "next/image";
 // Types
 interface MemeResponse {
   error?: string;
@@ -20,9 +20,16 @@ const MAX_MEMES = 5;
 const MIN_MEMES = 1;
 
 // Google Analytics helper
+type GtagAction = "event" | "config" | "js";
+type GtagParams = {
+  event_category?: string;
+  event_label?: string;
+  value?: number;
+};
+
 declare global {
   interface Window {
-    gtag: (...args: any[]) => void;
+    gtag: (action: GtagAction, eventName: string, params?: GtagParams) => void;
   }
 }
 
@@ -129,20 +136,24 @@ export default function Home() {
         setError("Unexpected response from server");
         trackEvent("error", "unexpected_response", 0);
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       let errorMessage = "Failed to generate memes. Try again.";
       let errorLabel = "unknown_error";
+      let statusCode = 0;
 
-      if (err.response?.status === 429) {
-        errorMessage = err.response.data.error || "Rate limit exceeded";
-        errorLabel = "rate_limit";
-      } else if (err.response?.status === 504) {
-        errorMessage = "Server timeout. Please try again later.";
-        errorLabel = "timeout";
+      if (axios.isAxiosError(err)) {
+        statusCode = err.response?.status ? err.response?.status : 0;
+        if (err.response?.status === 429) {
+          errorMessage = err.response.data.error || "Rate limit exceeded";
+          errorLabel = "rate_limit";
+        } else if (err.response?.status === 504) {
+          errorMessage = "Server timeout. Please try again later.";
+          errorLabel = "timeout";
+        }
       }
 
       setError(errorMessage);
-      trackEvent("error", errorLabel, err.response?.status || 0);
+      trackEvent("error", errorLabel, statusCode);
     } finally {
       setLoading(false);
     }
@@ -237,7 +248,7 @@ export default function Home() {
       {memes.map((src, index) => (
         <Card key={index} className="bg-gray-100 dark:bg-gray-800 shadow-md">
           <CardContent className="p-0">
-            <img
+            <Image
               src={src}
               alt={`Generated meme ${index + 1}`}
               className="w-full h-auto rounded-t-md object-contain"
