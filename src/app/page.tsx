@@ -1,103 +1,269 @@
-import Image from "next/image";
+"use client";
+import { useState, useEffect } from "react";
+import axios from "axios";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { Card, CardContent, CardFooter } from "@/components/ui/card";
+import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Sun, Moon } from "lucide-react";
+
+// Types
+interface MemeResponse {
+  error?: string;
+  meme_images?: string[];
+}
+
+// Constants
+// take base url from env
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_BASE_URL;
+const MAX_MEMES = 5;
+const MIN_MEMES = 1;
+
+// Google Analytics helper
+declare global {
+  interface Window {
+    gtag: (...args: any[]) => void;
+  }
+}
 
 export default function Home() {
-  return (
-    <div className="grid grid-rows-[20px_1fr_20px] items-center justify-items-center min-h-screen p-8 pb-20 gap-16 sm:p-20 font-[family-name:var(--font-geist-sans)]">
-      <main className="flex flex-col gap-[32px] row-start-2 items-center sm:items-start">
-        <Image
-          className="dark:invert"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={180}
-          height={38}
-          priority
-        />
-        <ol className="list-inside list-decimal text-sm/6 text-center sm:text-left font-[family-name:var(--font-geist-mono)]">
-          <li className="mb-2 tracking-[-.01em]">
-            Get started by editing{" "}
-            <code className="bg-black/[.05] dark:bg-white/[.06] px-1 py-0.5 rounded font-[family-name:var(--font-geist-mono)] font-semibold">
-              src/app/page.tsx
-            </code>
-            .
-          </li>
-          <li className="tracking-[-.01em]">
-            Save and see your changes instantly.
-          </li>
-        </ol>
+  // State
+  const [url, setUrl] = useState("");
+  const [count, setCount] = useState(1);
+  const [memes, setMemes] = useState<string[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [darkMode, setDarkMode] = useState(false);
 
-        <div className="flex gap-4 items-center flex-col sm:flex-row">
-          <a
-            className="rounded-full border border-solid border-transparent transition-colors flex items-center justify-center bg-foreground text-background gap-2 hover:bg-[#383838] dark:hover:bg-[#ccc] font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 sm:w-auto"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={20}
-              height={20}
+  // Effects
+  useEffect(() => {
+    const GA_MEASUREMENT_ID = process.env.GA_MEASUREMENT_ID;
+    const script1 = document.createElement("script");
+    script1.async = true;
+    script1.src = `https://www.googletagmanager.com/gtag/js?id=${GA_MEASUREMENT_ID}`;
+    document.head.appendChild(script1);
+
+    const script2 = document.createElement("script");
+    script2.innerHTML = `
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag('js', new Date());
+      gtag('config', '${GA_MEASUREMENT_ID}');
+    `;
+    document.head.appendChild(script2);
+
+    return () => {
+      document.head.removeChild(script1);
+      document.head.removeChild(script2);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (darkMode) {
+      document.documentElement.classList.add("dark");
+    } else {
+      document.documentElement.classList.remove("dark");
+    }
+  }, [darkMode]);
+
+  const trackEvent = (action: string, label?: string, value?: number) => {
+    if (typeof window !== "undefined" && window.gtag) {
+      window.gtag("event", action, {
+        event_category: "MemeGen",
+        event_label: label,
+        value: value,
+      });
+    }
+  };
+
+  const validateUrl = (url: string): boolean => {
+    return url.trim().length > 0;
+  };
+
+  const validateCount = (count: number): boolean => {
+    return count >= MIN_MEMES && count <= MAX_MEMES;
+  };
+
+  const generateMemes = async () => {
+    setError(null);
+    setMemes([]);
+
+    if (!validateUrl(url)) {
+      setError("Please enter a valid URL");
+      trackEvent("error", "invalid_url");
+      return;
+    }
+
+    if (!validateCount(count)) {
+      setError(`Number of memes must be between ${MIN_MEMES} and ${MAX_MEMES}`);
+      trackEvent("error", "invalid_count");
+      return;
+    }
+
+    setLoading(true);
+    trackEvent("generate_click", `count:${count}`, count);
+
+    try {
+      const params = new URLSearchParams({
+        url: url,
+        num_memes: count.toString(),
+      });
+
+      const response = await axios.post<MemeResponse>(
+        `${API_BASE_URL}/meme_campaign?${params.toString()}`
+      );
+
+      const data = response.data;
+
+      if (data.error) {
+        setError(data.error);
+        trackEvent("error", "api_error", 0);
+      } else if (Array.isArray(data.meme_images)) {
+        setMemes(data.meme_images);
+        trackEvent(
+          "generate_success",
+          "memes_generated",
+          data.meme_images.length
+        );
+      } else {
+        setError("Unexpected response from server");
+        trackEvent("error", "unexpected_response", 0);
+      }
+    } catch (err: any) {
+      let errorMessage = "Failed to generate memes. Try again.";
+      let errorLabel = "unknown_error";
+
+      if (err.response?.status === 429) {
+        errorMessage = err.response.data.error || "Rate limit exceeded";
+        errorLabel = "rate_limit";
+      } else if (err.response?.status === 504) {
+        errorMessage = "Server timeout. Please try again later.";
+        errorLabel = "timeout";
+      }
+
+      setError(errorMessage);
+      trackEvent("error", errorLabel, err.response?.status || 0);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleUrlChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    setUrl(e.target.value);
+  };
+
+  const handleCountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const value = Math.min(
+      MAX_MEMES,
+      Math.max(MIN_MEMES, Number(e.target.value))
+    );
+    setCount(value);
+  };
+
+  const toggleDarkMode = () => {
+    const newMode = !darkMode;
+    setDarkMode(newMode);
+    trackEvent("toggle_dark_mode", newMode ? "dark" : "light");
+  };
+
+  const handleDownload = (src: string, index: number) => {
+    trackEvent("download_meme", `meme_${index + 1}`);
+  };
+
+  // Render helpers
+  const renderHeader = () => (
+    <header className="w-full max-w-xl flex justify-between items-center mb-8">
+      <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100">
+        MemeGen.ai
+      </h1>
+      <Button
+        variant="ghost"
+        size="icon"
+        onClick={toggleDarkMode}
+        aria-label="Toggle Dark Mode"
+      >
+        {darkMode ? (
+          <Sun className="w-5 h-5 text-yellow-400" />
+        ) : (
+          <Moon className="w-5 h-5 text-gray-700" />
+        )}
+      </Button>
+    </header>
+  );
+
+  const renderForm = () => (
+    <section className="w-full max-w-xl space-y-4">
+      {error && (
+        <Alert variant="destructive" className="mb-4">
+          <AlertTitle>Error</AlertTitle>
+          <AlertDescription>{error}</AlertDescription>
+        </Alert>
+      )}
+
+      <Input
+        type="url"
+        placeholder="Enter webpage URL"
+        value={url}
+        onChange={handleUrlChange}
+        disabled={loading}
+        autoFocus
+        className="text-gray-900 dark:text-gray-100"
+      />
+
+      <Input
+        type="number"
+        placeholder={`Number of memes (max ${MAX_MEMES})`}
+        value={count}
+        onChange={handleCountChange}
+        min={MIN_MEMES}
+        max={MAX_MEMES}
+        disabled={loading}
+        className="text-gray-900 dark:text-gray-100"
+      />
+
+      <Button
+        onClick={generateMemes}
+        disabled={loading}
+        className="w-full"
+        size="lg"
+      >
+        {loading ? "Generating..." : "Generate Memes"}
+      </Button>
+    </section>
+  );
+
+  const renderMemes = () => (
+    <section className="w-full max-w-xl mt-10 grid grid-cols-1 sm:grid-cols-2 gap-6">
+      {memes.map((src, index) => (
+        <Card key={index} className="bg-gray-100 dark:bg-gray-800 shadow-md">
+          <CardContent className="p-0">
+            <img
+              src={src}
+              alt={`Generated meme ${index + 1}`}
+              className="w-full h-auto rounded-t-md object-contain"
+              loading="lazy"
             />
-            Deploy now
-          </a>
-          <a
-            className="rounded-full border border-solid border-black/[.08] dark:border-white/[.145] transition-colors flex items-center justify-center hover:bg-[#f2f2f2] dark:hover:bg-[#1a1a1a] hover:border-transparent font-medium text-sm sm:text-base h-10 sm:h-12 px-4 sm:px-5 w-full sm:w-auto md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Read our docs
-          </a>
-        </div>
-      </main>
-      <footer className="row-start-3 flex gap-[24px] flex-wrap items-center justify-center">
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/file.svg"
-            alt="File icon"
-            width={16}
-            height={16}
-          />
-          Learn
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/window.svg"
-            alt="Window icon"
-            width={16}
-            height={16}
-          />
-          Examples
-        </a>
-        <a
-          className="flex items-center gap-2 hover:underline hover:underline-offset-4"
-          href="https://nextjs.org?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <Image
-            aria-hidden
-            src="/globe.svg"
-            alt="Globe icon"
-            width={16}
-            height={16}
-          />
-          Go to nextjs.org →
-        </a>
-      </footer>
-    </div>
+          </CardContent>
+          <CardFooter className="flex justify-end">
+            <a
+              href={src}
+              download={`meme-${index + 1}.png`}
+              onClick={() => handleDownload(src, index)}
+              className="text-blue-600 dark:text-blue-400 hover:underline"
+            >
+              Download
+            </a>
+          </CardFooter>
+        </Card>
+      ))}
+    </section>
+  );
+
+  return (
+    <main className="min-h-screen bg-white dark:bg-gray-900 transition-colors duration-300 flex flex-col items-center p-6">
+      {renderHeader()}
+      {renderForm()}
+      {renderMemes()}
+    </main>
   );
 }
