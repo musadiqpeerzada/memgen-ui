@@ -43,6 +43,8 @@ export default function Home() {
   const [error, setError] = useState<string | null>(null);
   const [darkMode, setDarkMode] = useState(false);
 
+  const RATE_LIMIT = 2; // calls per hour
+  const RATE_LIMIT_TEXT = `Rate limit: ${RATE_LIMIT} generations per hour`;
   // Effects
   useEffect(() => {
     const GA_MEASUREMENT_ID = process.env.GA_MEASUREMENT_ID;
@@ -223,6 +225,15 @@ export default function Home() {
   );
   const renderForm = () => (
     <section className="w-full max-w-xl space-y-4">
+      <div className="text-center mb-6">
+        <p className="text-gray-700 dark:text-gray-300 mb-2">
+          Generate marketing memes for business by entering URL. AI profiles the
+          website and creates engaging memes.
+        </p>
+        <p className="text-sm text-gray-500 dark:text-gray-400">
+          {RATE_LIMIT_TEXT}
+        </p>
+      </div>
       {error && (
         <Alert variant="destructive" className="mb-4">
           <AlertTitle>Error</AlertTitle>
